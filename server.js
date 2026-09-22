@@ -503,6 +503,17 @@ function tickMatch(m) {
   const state=m.liveState||(m.liveState={});
   state.players=state.players||{};
   const clamp=(v,a=4,b=96)=>Math.max(a,Math.min(b,v));
+  if(state.engineVersion!==2){
+    state.engineVersion=2;
+    state.ball={x:50,y:50};
+    state.possession='home';
+    state.action='kickoff';
+    state.actionPlayerId=null;
+    state.targetPlayerId=null;
+    state.from={x:50,y:50};
+    state.to={x:50,y:50};
+    state.players={};
+  }
   const role=(p)=>String(p?.position||'').toUpperCase().includes('GK')?'GK':String(p?.position||'').toUpperCase().includes('DEF')?'DEF':String(p?.position||'').toUpperCase().includes('MID')?'MID':'ATT';
   const anchors={
     home:[[50,90],[34,70],[66,70],[50,52],[50,29]],
