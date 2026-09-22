@@ -265,9 +265,25 @@ function validatePlan(c, input = {}) {
     ps = defaultXI({ ...c, formation });
     if (ps.length !== 5) throw fail('A valid 5-player lineup is required with the selected formation.');
   }
+  const starting = ps.map(p => p.id);
+  const benchPool = clubPlayers(c).filter(p => !starting.includes(p.id)).sort((a,b) => b.overall-a.overall);
+  const requestedBench = Array.isArray(input.bench) ? input.bench.filter(id => benchPool.some(p => p.id === id)).slice(0, 5) : [];
+  const bench = requestedBench.length ? requestedBench : benchPool.slice(0, 5).map(p => p.id);
+  const captain = starting.includes(input.captain) ? input.captain : starting[0];
+  const setPieces = {
+    penalty: starting.includes(input?.setPieces?.penalty) ? input.setPieces.penalty : captain,
+    freeKick: starting.includes(input?.setPieces?.freeKick) ? input.setPieces.freeKick : captain,
+    corner: starting.includes(input?.setPieces?.corner) ? input.setPieces.corner : captain
+  };
   return {
     formation,
-    startingXI: ps.map(p => p.id),
+    startingXI: starting,
+    bench,
+    captain,
+    setPieces,
+    attackingPlan: ['Balanced','Direct','Wide','Possession'].includes(input.attackingPlan) ? input.attackingPlan : (c.matchPlan?.attackingPlan || 'Balanced'),
+    defensivePlan: ['Balanced','Press','Low Block','Contain'].includes(input.defensivePlan) ? input.defensivePlan : (c.matchPlan?.defensivePlan || 'Balanced'),
+    alternateFormation: FORMATIONS[input.alternateFormation] ? input.alternateFormation : (FORMATIONS[c.matchPlan?.alternateFormation] ? c.matchPlan.alternateFormation : '1-2-1'),
     tactics: {
       mentality: ['Defensive','Balanced','Attacking'].includes(input?.tactics?.mentality) ? input.tactics.mentality : (c.tactics?.mentality || 'Balanced'),
       pressing: Math.max(0, Math.min(100, Number(input?.tactics?.pressing ?? c.tactics?.pressing ?? 50))),
@@ -352,18 +368,19 @@ function standings(l) {
     .map((x, i) => ({ rank: i + 1, ...x }));
 }
 
-function makeMatch(home, away, fixtureId, live = false) {
-  const hp = validatePlan(home, { formation: home.formation, startingXI: home.matchPlan?.startingXI, tactics: home.matchPlan?.tactics });
-  const ap = validatePlan(away, { formation: away.formation, startingXI: away.matchPlan?.startingXI, tactics: away.matchPlan?.tactics });
+function makeMatch(home, away, fixtureId, live = false, preMatch = false) {
+  const hp = validatePlan(home, { formation: home.formation, startingXI: home.matchPlan?.startingXI, tactics: home.matchPlan?.tactics, captain: home.matchPlan?.captain, setPieces: home.matchPlan?.setPieces, attackingPlan: home.matchPlan?.attackingPlan, defensivePlan: home.matchPlan?.defensivePlan, alternateFormation: home.matchPlan?.alternateFormation, bench: home.matchPlan?.bench });
+  const ap = validatePlan(away, { formation: away.formation, startingXI: away.matchPlan?.startingXI, tactics: away.matchPlan?.tactics, captain: away.matchPlan?.captain, setPieces: away.matchPlan?.setPieces, attackingPlan: away.matchPlan?.attackingPlan, defensivePlan: away.matchPlan?.defensivePlan, alternateFormation: away.matchPlan?.alternateFormation, bench: away.matchPlan?.bench });
+  const pre = preMatch && !live;
   return {
     id: makeId('match'),
     fixtureId,
     leagueId: league(db.fixtures.find(f => f.id === fixtureId)?.leagueId)?.id,
     homeClubId: home.id,
     awayClubId: away.id,
-    minute: live ? 0 : 90,
-    status: live ? 'live' : 'finished',
-    phase: live ? 'first_half' : 'full_time',
+    minute: pre || live ? 0 : 90,
+    status: pre ? 'pre_match' : live ? 'live' : 'finished',
+    phase: pre ? 'pre_match' : live ? 'first_half' : 'full_time',
     homeScore: 0,
     awayScore: 0,
     possession: 50,
@@ -412,6 +429,11 @@ function finishMatch(m) {
     }
   }
   const h = club(m.homeClubId), a = club(m.awayClubId);
+  m.summary = {
+    income: { home: 5000, away: 5000 },
+    goals: [...m.homePlan.startingXI, ...m.awayPlan.startingXI].map(id => player(id)).filter(Boolean).map(p => ({ playerId:p.id, name:p.name, clubId:p.clubId, goals:m.playerStats[p.id]?.goals||0, assists:m.playerStats[p.id]?.assists||0, rating:Number((m.playerStats[p.id]?.rating||6).toFixed(1)) })),
+    fitnessChanges: [...m.homePlan.startingXI, ...m.awayPlan.startingXI].map(id => player(id)).filter(Boolean).map(p => ({ playerId:p.id, name:p.name, change:-8 }))
+  };
   addEvent(m, 'full_time', null, null, 'Full-time: ' + m.homeScore + '-' + m.awayScore);
   for (const u of db.users.filter(x => x.clubId === m.homeClubId || x.clubId === m.awayClubId)) {
     notify(u.id, 'match', 'Full time', h.name + ' ' + m.homeScore + '-' + m.awayScore + ' ' + a.name, { matchId: m.id });
@@ -530,7 +552,7 @@ function tickMatch(m) {
       p.fatigue = Math.min(100, p.fatigue + .13);
     }
   }
-  if (m.minute === 45) { m.phase = 'halftime'; addEvent(m, 'halftime', null, null, 'Half-time.'); }
+  if (m.minute === 45) { m.phase = 'halftime'; m.status = 'halftime'; addEvent(m, 'halftime', null, null, 'Half-time. Tactical changes are available.'); }
   if (m.minute === 46) { m.phase = 'second_half'; addEvent(m, 'kickoff', null, null, 'Second half begins.'); }
   if (m.minute === 90) { m.phase = 'stoppage'; addEvent(m, 'stoppage', null, null, 'Stoppage time.'); }
   if (m.minute >= 93) {
@@ -815,17 +837,17 @@ async function api(req, res) {
         matchday: 0,
         homeClubId: userClub.id,
         awayClubId: opponent.id,
-        status: 'live',
+        status: 'pre_match',
         homeScore: null,
         awayScore: null,
         matchId: null,
         deadline: minutesFromNow(10)
       };
       db.fixtures.push(fixture);
-      const m = makeMatch(userClub, opponent, fixture.id, true);
+      const m = makeMatch(userClub, opponent, fixture.id, false, true);
       db.matches.push(m);
       fixture.matchId = m.id;
-      addEvent(m, 'kickoff', null, null, 'Kick-off! ' + userClub.name + ' vs ' + opponent.name);
+      addEvent(m, 'pre_match', null, null, userClub.name + ' vs ' + opponent.name + ' — ready for kick-off.');
       save();
       return send(res, 201, { match: m, opponent });
     }
@@ -839,6 +861,18 @@ async function api(req, res) {
         return send(res, 200, { match: db.matches.find(x => x.id === f.matchId) });
       }
       if (f.status === 'live') return send(res, 200, { match: db.matches.find(x => x.id === f.matchId) });
+      if (f.status === 'pre_match') {
+        const existing = db.matches.find(x => x.id === f.matchId);
+        if (!existing) throw fail('Pre-match state not found.', 500);
+        existing.status = 'live';
+        existing.phase = 'first_half';
+        existing.minute = 0;
+        existing.startedAt = now();
+        f.status = 'live';
+        addEvent(existing, 'kickoff', null, null, 'Kick-off!');
+        save();
+        return send(res, 200, { match: existing });
+      }
       const h = club(f.homeClubId), a = club(f.awayClubId);
       const m = makeMatch(h, a, f.id, true);
       db.matches.push(m);
@@ -847,6 +881,59 @@ async function api(req, res) {
       addEvent(m, 'kickoff', null, null, 'Kick-off!');
       save();
       return send(res, 201, { match: m });
+    }
+
+    if (req.method === 'POST' && p === '/api/matches/resume') {
+      const c = requireClub(u);
+      const b = await readBody(req);
+      const m = db.matches.find(x => x.id === b.matchId);
+      if (!m || (m.homeClubId !== c.id && m.awayClubId !== c.id)) throw fail('Match not found.', 404);
+      if (m.status !== 'halftime') throw fail('The match is not at half-time.');
+      m.status = 'live';
+      m.phase = 'second_half';
+      m.startedAt = new Date(Date.now() - 45 * 1000).toISOString();
+      m.updatedAt = now();
+      addEvent(m, 'kickoff', null, null, 'Second half begins.');
+      save();
+      return send(res, 200, { match: m });
+    }
+
+    if (req.method === 'POST' && p === '/api/matches/substitute') {
+      const c = requireClub(u);
+      const b = await readBody(req);
+      const m = db.matches.find(x => x.id === b.matchId);
+      if (!m || (m.homeClubId !== c.id && m.awayClubId !== c.id)) throw fail('Match not found.', 404);
+      if (m.status !== 'halftime') throw fail('Substitutions are available at half-time.');
+      const own = m.homeClubId === c.id ? m.homePlan : m.awayPlan;
+      const out = player(b.outId), inn = player(b.inId);
+      if (!out || !inn || !own.startingXI.includes(out.id) || !own.bench.includes(inn.id) || out.clubId !== c.id || inn.clubId !== c.id) throw fail('Invalid substitution.');
+      own.startingXI = own.startingXI.map(id => id === out.id ? inn.id : id);
+      own.bench = own.bench.map(id => id === inn.id ? out.id : id);
+      if (own.captain === out.id) own.captain = inn.id;
+      if (!m.playerStats[inn.id]) m.playerStats[inn.id] = { goals:0, assists:0, shots:0, passes:0, saves:0, rating:6.0 };
+      delete m.playerStats[out.id];
+      addEvent(m, 'substitution', c.id, inn.id, inn.name + ' replaces ' + out.name + '.', m.minute);
+      save();
+      return send(res, 200, { match: m });
+    }
+
+    if (req.method === 'POST' && p === '/api/matches/strategy') {
+      const c = requireClub(u);
+      const b = await readBody(req);
+      const m = db.matches.find(x => x.id === b.matchId);
+      if (!m || (m.homeClubId !== c.id && m.awayClubId !== c.id)) throw fail('Match not found.', 404);
+      if (m.status !== 'halftime') throw fail('Tactical changes are available at half-time.');
+      const own = m.homeClubId === c.id ? m.homePlan : m.awayPlan;
+      const patch = b.plan || {};
+      if (['Defensive','Balanced','Attacking'].includes(patch.mentality)) own.tactics.mentality = patch.mentality;
+      if (Number.isFinite(Number(patch.pressing))) own.tactics.pressing = Math.max(0, Math.min(100, Number(patch.pressing)));
+      if (Number.isFinite(Number(patch.passing))) own.tactics.passing = Math.max(0, Math.min(100, Number(patch.passing)));
+      if (Number.isFinite(Number(patch.line))) own.tactics.line = Math.max(0, Math.min(100, Number(patch.line)));
+      if (['Balanced','Direct','Wide','Possession'].includes(patch.attackingPlan)) own.attackingPlan = patch.attackingPlan;
+      if (['Balanced','Press','Low Block','Contain'].includes(patch.defensivePlan)) own.defensivePlan = patch.defensivePlan;
+      if (FORMATIONS[patch.alternateFormation]) own.alternateFormation = patch.alternateFormation;
+      save();
+      return send(res, 200, { match: m });
     }
 
     if (req.method === 'GET' && p.startsWith('/api/matches/')) {
