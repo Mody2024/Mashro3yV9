@@ -164,7 +164,9 @@ const REAL_PLAYERS = [
 ];
 
 function newPlayer(clubId, position, bot = false) {
-  const ownedNames = new Set(clubPlayers(clubId).map(x => x.name));\n  let candidates = REAL_PLAYERS.filter(x => x.position === position && !ownedNames.has(x.name));\n  if (!candidates.length) candidates = REAL_PLAYERS.filter(x => x.position === position);
+  const ownedNames = new Set(clubPlayers(clubId).map(x => x.name));
+  let candidates = REAL_PLAYERS.filter(x => x.position === position && !ownedNames.has(x.name));
+  if (!candidates.length) candidates = REAL_PLAYERS.filter(x => x.position === position);
   const base = candidates[Math.floor(Math.random() * candidates.length)] || {name:randomName(),position,overall:72,pace:70,shooting:65,passing:65,dribbling:65,defending:65,physical:65,nationality:'International',age:24,foot:'Right'};
   const p = {
     id: makeId('pl'), clubId, name: base.name, position: base.position, nationality: base.nationality,
