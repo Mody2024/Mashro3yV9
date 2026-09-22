@@ -307,7 +307,6 @@ function addEvent(m, type, clubId, playerId, text, minute = m.minute) {
 }
 
 function finishMatch(m) {
-  if (m.status === 'finished') return;
   m.status = 'finished';
   m.phase = 'full_time';
   m.minute = 90;
@@ -359,6 +358,7 @@ function simulateInstant(f) {
   m.awayStats.onTarget = Math.min(m.awayStats.shots, Math.floor(Math.random() * 6));
   m.possession = Math.max(25, Math.min(75, Math.round(50 + (hStrength - aStrength) * 1.5)));
   db.matches.push(m);
+  m.status = 'live';
   addEvent(m, 'full_time', null, null, 'Full-time: ' + m.homeScore + '-' + m.awayScore);
   finishMatch(m);
   return m;
