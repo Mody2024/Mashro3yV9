@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: skl27
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: SKL_DATA_DIR
+        value: /var/data
+    disk:
+      name: skl27-data
+      mountPath: /var/data
+      sizeGB: 1
