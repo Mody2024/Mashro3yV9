@@ -787,6 +787,41 @@ async function api(req, res) {
       });
     }
 
+    if (req.method === 'POST' && p === '/api/kickoff/start') {
+      const userClub = requireClub(u);
+      ensureSquadDepth(userClub, 10);
+      let opponents = db.clubs.filter(x => x.bot && x.id !== userClub.id);
+      let opponent = opponents.sort((a, b) => {
+        const ao = clubPlayers(a).reduce((s, p) => s + p.overall, 0);
+        const bo = clubPlayers(b).reduce((s, p) => s + p.overall, 0);
+        return Math.abs(ao - clubPlayers(userClub).reduce((s,p)=>s+p.overall,0)) -
+          Math.abs(bo - clubPlayers(userClub).reduce((s,p)=>s+p.overall,0));
+      })[0];
+      if (!opponent) {
+        opponent = newClub('SKL Invitational XI', true);
+        ensureSquadDepth(opponent, 10);
+      }
+      const fixture = {
+        id: makeId('fix'),
+        leagueId: null,
+        matchday: 0,
+        homeClubId: userClub.id,
+        awayClubId: opponent.id,
+        status: 'live',
+        homeScore: null,
+        awayScore: null,
+        matchId: null,
+        deadline: minutesFromNow(10)
+      };
+      db.fixtures.push(fixture);
+      const m = makeMatch(userClub, opponent, fixture.id, true);
+      db.matches.push(m);
+      fixture.matchId = m.id;
+      addEvent(m, 'kickoff', null, null, 'Kick-off! ' + userClub.name + ' vs ' + opponent.name);
+      save();
+      return send(res, 201, { match: m, opponent });
+    }
+
     if (req.method === 'POST' && p === '/api/matches/start') {
       const c = requireClub(u);
       const b = await readBody(req);
