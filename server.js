@@ -546,12 +546,20 @@ function tickMatch(m) {
   m.updatedAt = now();
 }
 
+function syncLiveMatch(m) {
+  if (!m || m.status !== 'live') return false;
+  const target = Math.min(93, Math.max(0, Math.floor((Date.now() - new Date(m.startedAt).getTime()) / 1000)));
+  let changed = false;
+  while (m.status === 'live' && m.minute < target) { tickMatch(m); changed = true; }
+  return changed;
+}
 function startMatchLoop() {
+  if (process.env.VERCEL) return;
   setInterval(() => {
     let dirty = false;
-    for (const m of db.matches.filter(x => x.status === 'live')) { tickMatch(m); dirty = true; }
+    for (const m of db.matches.filter(x => x.status === 'live')) dirty = syncLiveMatch(m) || dirty;
     if (dirty) save();
-  }, 500);
+  }, 1000);
 }
 
 function requireClub(u) {
@@ -844,6 +852,7 @@ async function api(req, res) {
     if (req.method === 'GET' && p.startsWith('/api/matches/')) {
       const m = db.matches.find(x => x.id === p.split('/')[3]);
       if (!m) throw fail('Match not found.', 404);
+      if (m.status === 'live' && syncLiveMatch(m)) save();
       if (m.homeClubId !== u.clubId && m.awayClubId !== u.clubId && !club(m.homeClubId)?.bot && !club(m.awayClubId)?.bot) {
         throw fail('Forbidden.', 403);
       }
