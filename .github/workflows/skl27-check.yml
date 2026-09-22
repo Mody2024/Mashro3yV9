@@ -4,7 +4,7 @@ on:
     branches: [main]
   pull_request:
 jobs:
-  server:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -12,3 +12,4 @@ jobs:
         with:
           node-version: 22
       - run: node --check server.js
+      - run: npx --yes esbuild skl27.js --loader:js=jsx --outfile=/tmp/skl27-check.js
