@@ -25,3 +25,72 @@ body{background:#080d12;color:#f4f7f5}
 @media(max-width:900px){.topGameBar{padding:0 12px}.topLogo{margin-right:8px}.topTabs button{min-width:58px;font-size:8px}.topUser>b{display:none}.game-main{padding:22px 14px 88px}.menuBoard,.playGrid{grid-template-columns:1fr 1fr;grid-template-rows:auto}.menuTile,.bigPlay{min-height:150px;grid-row:auto}.featuredPlayer{grid-column:span 2}.tacticsPro,.matchBoard,.settingsGrid,.clubCreate{grid-template-columns:1fr}.tacticPitch{min-height:500px}.marketGrid{grid-template-columns:1fr 1fr}.matchScore{padding:20px 10px}.bigScore strong{font-size:40px}.titlePlayer{width:60vw;height:72vh;opacity:.55}.titleLeft{left:-22%}.titleRight{right:-22%}.titleCenter h1{font-size:42px}.clubCreateVisual{min-height:45vh;padding:60px 25px}.clubCreateCard{margin:0 auto 40px}.homeTop h1{font-size:34px}}
 @media(max-width:600px){.topTabs button{min-width:auto;padding:0 7px}.topUser .profileExit{font-size:8px;padding:7px}.homeRail{grid-template-columns:1fr}.homeRail>div{border-right:0;border-bottom:1px solid #26323a}.menuBoard,.playGrid{grid-template-columns:1fr}.featuredPlayer{grid-column:auto}.marketGrid,.trainingGrid{grid-template-columns:1fr}.titlePlayer{width:85vw;opacity:.35}.titleLeft{left:-38%}.titleRight{right:-38%}.titleCenter{padding:0 15px}.bigLogo{font-size:58px}.titleFooter{display:none}.authGameCard{padding:28px 22px}.clubRating{width:82px;height:82px}.clubRating b{font-size:28px}}
 .clubHero{display:flex;justify-content:space-between;align-items:center;padding:35px;background:linear-gradient(120deg,#20343c,#10171d);border:1px solid #34434d}.clubHero h2{font-size:32px;margin:8px 0}.clubHero p{color:#819099}.clubTiles{display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-top:6px}.clubTiles button{min-height:155px;text-align:left;border-radius:0;background:#111a20;border:1px solid #2d3941;padding:25px}.clubTiles button:hover{transform:none;border-color:#e8ff38}.clubTiles small{color:#7e8b93;font-size:8px;letter-spacing:2px}.clubTiles h2{font-size:25px;margin:8px 0}.clubTiles p{color:#7d8a92;font-size:11px}@media(max-width:600px){.clubHero{display:block}.clubHero button{margin-top:20px}.clubTiles{grid-template-columns:1fr}}
+/* SKL27 GAME UI V2 — cinematic football-game presentation */
+.titleScreen{background:#03070a;isolation:isolate}
+.titleScreen:before{background:linear-gradient(90deg,#020509ee 0%,#02050966 24%,#02050918 50%,#02050966 76%,#020509ee 100%),linear-gradient(180deg,#02050933 0%,#02050922 42%,#020509f5 100%);z-index:1}
+.titleNoise{background:radial-gradient(circle at 50% 35%,#e8ff3818,transparent 30%),radial-gradient(circle at 50% 100%,#0d5b4820,transparent 48%);z-index:4}
+.stadiumLights{background:radial-gradient(ellipse at 50% -5%,#fff9 0 1%,transparent 11%),radial-gradient(ellipse at 15% 0,#e8ff3855,transparent 23%),radial-gradient(ellipse at 85% 0,#8effdd33,transparent 23%);filter:blur(2px)}
+.stadiumGrid{position:absolute;inset:0;z-index:2;background:linear-gradient(transparent 70%,#e8ff3808),repeating-linear-gradient(90deg,transparent 0 8vw,#ffffff04 8.1vw 8.2vw);mask-image:linear-gradient(to bottom,transparent,#000 35%,#000)}
+.titlePlayer{bottom:-4%;width:44vw;max-width:570px;height:88vh;z-index:3;overflow:visible;mask-image:linear-gradient(to bottom,#000 0%,#000 72%,transparent 100%)}
+.titlePlayer img{display:block;width:100%;height:100%;object-fit:cover;object-position:center top;mix-blend-mode:normal;opacity:.72;filter:saturate(.85) contrast(1.14) brightness(.82)}
+.titlePlayer:after{background:linear-gradient(90deg,#03070a 0%,transparent 30%,transparent 70%,#03070a 100%),linear-gradient(0deg,#03070a 0%,transparent 43%,transparent 78%,#03070a55 100%)}
+.titleLeft{left:-7%;transform:perspective(900px) rotateY(7deg)}
+.titleRight{right:-7%;transform:perspective(900px) rotateY(-7deg)}
+.titleLeft .playerFade,.titleRight .playerFade{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 35%,#03070aee 100%);z-index:3}
+.titleCenter{margin-top:-10px;max-width:720px;padding:0 20px}
+.bigLogo{font-size:82px;line-height:.8;text-shadow:0 0 50px #e8ff3855}
+.bigLogo small{font-size:27px;letter-spacing:0;color:#fff;margin-left:4px}
+.titleKicker{font-size:10px;letter-spacing:6px;color:#c0cbd0;margin-top:8px}
+.seasonLine{margin-top:22px}
+.titleCenter h1{font-size:clamp(44px,6.5vw,86px);letter-spacing:-4px;margin:20px 0 14px}
+.titleCenter h1 em{display:inline-block;text-shadow:0 0 30px #e8ff3830}
+.titleCenter p{font-size:10px;color:#aeb8bd}
+.continueBtn{min-width:300px;height:54px;margin-top:28px;border:1px solid #a7c700;background:linear-gradient(180deg,#e8ff38,#8aa800);box-shadow:0 10px 35px #e8ff3825;color:#0a1007;font-weight:1000;letter-spacing:2px;display:inline-flex;justify-content:center;gap:28px;align-items:center;cursor:pointer}
+.continueBtn b{font-size:18px}.continueBtn:hover{filter:brightness(1.08);transform:translateY(-2px)}
+.titleData{position:absolute;z-index:8;top:24px;left:50%;transform:translateX(-50%);display:flex;gap:34px;color:#75838a;font-size:8px;letter-spacing:2px}
+.titleData span:nth-child(2){color:#e8ff38}
+.imageCredits{position:absolute;z-index:8;right:24px;bottom:8px;color:#4d5a60;font-size:7px}
+.game-main{max-width:1450px}
+.homeMenu{padding-top:26px}
+.homeTop{border-bottom:1px solid #28343b;padding-bottom:20px;margin-bottom:8px}
+.homeTop h1{font-size:42px;letter-spacing:-1px}
+.homeTop p{max-width:620px}
+.menuBoard{grid-template-columns:1.35fr .8fr .8fr;grid-template-rows:190px 190px;gap:5px}
+.menuTile{position:relative;overflow:hidden;border:1px solid #2b3941;background:#11191e;padding:24px;border-radius:0;text-align:left;cursor:pointer}
+.menuTile:hover{border-color:#e8ff38;transform:translateY(-1px)}
+.menuTile small{position:relative;z-index:4;color:#9ba7ad;font-size:8px;letter-spacing:2px}
+.menuTile h2{position:relative;z-index:4;font-size:26px;letter-spacing:-.5px;margin:8px 0}
+.menuTile span{position:relative;z-index:4;color:#8a979e;font-size:10px}
+.tileHero{grid-row:span 2;padding:0;background:#091116}
+.tileHero>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 18%;opacity:.72;filter:saturate(.8) contrast(1.15)}
+.tileShade{position:absolute;inset:0;background:linear-gradient(90deg,#05090c 0%,#05090c99 38%,transparent 100%),linear-gradient(0deg,#05090cf2 0%,transparent 65%)}
+.tileContent{position:absolute;left:28px;right:28px;bottom:24px;z-index:5}
+.tileContent h2{font-size:36px}
+.tileContent p{max-width:480px;color:#a7b2b7;font-size:11px}
+.tileContent strong{display:inline-block;margin-top:10px;color:#e8ff38;font-size:10px;letter-spacing:2px}
+.tileSquad{background:linear-gradient(135deg,#17242a,#0c1318)}
+.tilePlayerMini{position:absolute;right:-5px;bottom:-18px;width:120px;height:180px;z-index:2}
+.tilePlayerMini img{width:100%;height:100%;object-fit:cover;object-position:center top;mask-image:linear-gradient(#000 45%,transparent 100%);filter:saturate(.8) contrast(1.15)}
+.tilePlay{background:linear-gradient(135deg,#e8ff38 0,#9db900 100%);color:#0a1007}
+.tilePlay small,.tilePlay span{color:#172000}.tilePlay i{position:absolute;right:24px;bottom:20px;font-style:normal;font-size:30px}
+.tileOnline{background:linear-gradient(135deg,#172a2d,#0b1418)}
+.tileOnline>b{position:absolute;right:22px;bottom:18px;font-size:42px;color:#e8ff38}
+.tileTransfers{background:linear-gradient(135deg,#182027,#0a1014)}
+.tilePlayerPair{position:absolute;right:-5px;bottom:-25px;width:150px;height:145px;display:flex;align-items:flex-end;z-index:2}
+.tilePlayerPair img{width:82px;height:130px;object-fit:cover;object-position:center top;mask-image:linear-gradient(#000 35%,transparent 100%);filter:saturate(.75) contrast(1.1)}
+.tilePlayerPair img+img{margin-left:-32px;opacity:.72}
+.tileTraining{background:linear-gradient(135deg,#151f24,#090f13)}
+.tileTraining>strong{position:absolute;right:25px;bottom:20px;color:#e8ff38;font-size:30px}
+.starRail{display:flex;gap:5px;margin-top:6px;background:#0a1115;border-top:1px solid #2b3740;border-bottom:1px solid #2b3740;padding:8px}
+.railTitle{width:190px;display:grid;align-content:center;padding:8px 12px}.railTitle small{font-size:8px;letter-spacing:2px;color:#e8ff38}.railTitle span{font-size:9px;color:#66757d;margin-top:5px}
+.starRail article{height:84px;min-width:210px;flex:1;display:flex;align-items:center;background:#111a20;border:1px solid #26333a;overflow:hidden;position:relative}
+.starRail article img{width:75px;height:100%;object-fit:cover;object-position:center top;filter:saturate(.8);mask-image:linear-gradient(90deg,#000 60%,transparent 100%)}
+.starRail article div{display:grid;gap:3px;margin-left:-5px;z-index:2}.starRail article small{font-size:7px;color:#7e8a91}.starRail article b{font-size:12px}.starRail article span{font-size:9px;color:#e8ff38}
+.homeRail{margin-top:6px}
+.imageClubHero{position:relative;overflow:hidden;background:#0b1217;padding:0;min-height:220px}
+.imageClubHero>img{position:absolute;right:0;top:0;height:100%;width:48%;object-fit:cover;object-position:center top;opacity:.72;filter:saturate(.75) contrast(1.15)}
+.clubHeroShade{position:absolute;inset:0;background:linear-gradient(90deg,#0b1217 0%,#0b1217e8 42%,#0b121780 75%,transparent 100%)}
+.imageClubHero>div:not(.clubHeroShade){position:relative;z-index:3;padding:38px}
+.imageClubHero>button{position:relative;z-index:3;margin-right:35px}
+@media(max-width:900px){.menuBoard{grid-template-columns:1fr 1fr;grid-template-rows:180px 180px 180px}.tileHero{grid-column:span 2;grid-row:auto}.starRail{overflow-x:auto}.railTitle{min-width:150px}.starRail article{min-width:190px}.titleData{display:none}}
+@media(max-width:600px){.menuBoard{grid-template-columns:1fr;grid-template-rows:auto}.tileHero{grid-column:auto;min-height:260px}.menuTile{min-height:145px}.tileContent h2{font-size:29px}.starRail{margin-left:-14px;margin-right:-14px}.railTitle{display:none}.starRail article{min-width:190px}.imageClubHero>img{width:55%;opacity:.4}.imageClubHero>button{margin:0 0 20px 38px}.titlePlayer{width:68vw;height:74vh;opacity:.48}.titleLeft{left:-34%}.titleRight{right:-34%}.titleCenter{margin-top:-5px}.bigLogo{font-size:62px}.titleKicker{font-size:8px;letter-spacing:4px}.continueBtn{min-width:270px}.titleCenter h1{font-size:43px}}
