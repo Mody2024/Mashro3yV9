@@ -15,7 +15,7 @@ jobs:
       - name: Compile frontend
         run: |
           set +e
-          npx --yes esbuild skl27.js --loader:js=jsx --outfile=/tmp/skl27-check.js > /tmp/esbuild.log 2>&1
+          npx --yes esbuild skl27.js --loader:.js=jsx --outfile=/tmp/skl27-check.js > /tmp/esbuild.log 2>&1
           code=$?
           cat /tmp/esbuild.log
           echo "ESBUILD_EXIT=$code"
