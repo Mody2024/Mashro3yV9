@@ -179,6 +179,16 @@ function newPlayer(clubId, position, bot = false) {
   return p;
 }
 
+function ensureSquadDepth(c, target = 10) {
+  if (!c) return;
+  const plan = ['GK','GK','DEF','DEF','DEF','MID','MID','MID','FWD','FWD'];
+  while (c.playerIds.length < target) {
+    const pos = plan[c.playerIds.length] || positions[c.playerIds.length % positions.length];
+    const p = newPlayer(c.id, pos, c.bot);
+    c.playerIds.push(p.id);
+  }
+}
+
 function newClub(name, bot = false) {
   const c = {
     id: makeId('club'),
