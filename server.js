@@ -31,14 +31,20 @@ const normalizeDb = value => {
 };
 
 async function supabaseRequest(pathname, options = {}) {
+  const keyHeaders = {
+    apikey: SUPABASE_SECRET_KEY,
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
+  // New Supabase sb_secret_* keys are API keys, not JWTs. They must not be
+  // sent as Authorization: Bearer, otherwise PostgREST can reject them as
+  // invalid JWTs. Legacy service_role JWTs still need the Bearer header.
+  if (!SUPABASE_SECRET_KEY.startsWith('sb_')) {
+    keyHeaders.Authorization = 'Bearer ' + SUPABASE_SECRET_KEY;
+  }
   const r = await fetch(SUPABASE_URL + '/rest/v1/' + pathname, {
     ...options,
-    headers: {
-      apikey: SUPABASE_SECRET_KEY,
-      Authorization: 'Bearer ' + SUPABASE_SECRET_KEY,
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    }
+    headers: keyHeaders
   });
   const text = await r.text();
   if (!r.ok) throw new Error('Supabase ' + r.status + ': ' + text);
