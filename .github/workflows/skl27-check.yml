@@ -13,3 +13,4 @@ jobs:
           node-version: 22
       - run: node --check server.js
       - run: npx --yes esbuild skl27.js --loader:js=jsx --outfile=/tmp/skl27-check.js
+      - run: test -s /tmp/skl27-check.js
