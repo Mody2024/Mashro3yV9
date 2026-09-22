@@ -353,6 +353,7 @@ function makeMatch(home, away, fixtureId, live = false) {
     awayPlan: ap,
     homeStats: { shots: 0, onTarget: 0, saves: 0, passes: 0, tackles: 0 },
     awayStats: { shots: 0, onTarget: 0, saves: 0, passes: 0, tackles: 0 },
+    playerStats: Object.fromEntries([...hp.startingXI, ...ap.startingXI].map(id => [id, { goals: 0, assists: 0, shots: 0, passes: 0, saves: 0, rating: 6.0 }])),
     startedAt: now(),
     updatedAt: now()
   };
@@ -463,6 +464,7 @@ function tickMatch(m) {
   m.possession = Math.max(20, Math.min(80, Math.round(50 + (hp.passing - ap.passing) * .16 + (hs - as) * .7)));
   m.homeStats.passes += 2 + Math.floor(Math.random() * 5);
   m.awayStats.passes += 2 + Math.floor(Math.random() * 5);
+  for (const sidePlan of [m.homePlan, m.awayPlan]) for (const pid of sidePlan.startingXI) if (m.playerStats[pid]) m.playerStats[pid].passes += 1 + Math.floor(Math.random() * 3);
   for (const side of ['home', 'away']) {
     const own = side === 'home' ? h : a;
     const opp = side === 'home' ? a : h;
@@ -475,8 +477,10 @@ function tickMatch(m) {
     const chance = Math.max(.018, Math.min(.15, .055 + (ownStr - oppStr) * .002 + (plan.tactics.pressing - other.pressing) * .00035 + mentalityBonus));
     if (Math.random() < chance) {
       stats.shots++;
+      if (m.playerStats[shooterId]) m.playerStats[shooterId].shots++;
       const attackers = plan.startingXI.map(player).filter(p => p && p.position !== 'GK');
       const shooter = attackers[Math.floor(Math.random() * attackers.length)] || player(plan.startingXI[0]);
+      const shooterId = shooter?.id;
       const gkId = (side === 'home' ? m.awayPlan.startingXI : m.homePlan.startingXI)
         .map(player).find(p => p?.position === 'GK')?.id;
       const gk = player(gkId);
@@ -484,12 +488,17 @@ function tickMatch(m) {
       if (Math.random() < goalChance) {
         if (side === 'home') m.homeScore++; else m.awayScore++;
         stats.onTarget++;
-        addEvent(m, 'goal', own.id, shooter?.id, own.name + ' score — ' + (shooter?.name || 'attacker') + '!', m.minute);
+        if (m.playerStats[shooterId]) { m.playerStats[shooterId].goals++; m.playerStats[shooterId].rating = Math.min(10, m.playerStats[shooterId].rating + 0.9); }
+        const helpers = attackers.filter(p => p.id !== shooterId);
+        const helper = helpers.length && Math.random() < .72 ? helpers[Math.floor(Math.random() * helpers.length)] : null;
+        if (helper && m.playerStats[helper.id]) { m.playerStats[helper.id].assists++; m.playerStats[helper.id].rating = Math.min(10, m.playerStats[helper.id].rating + 0.35); }
+        addEvent(m, 'goal', own.id, shooterId, own.name + ' score — ' + (shooter?.name || 'attacker') + (helper ? ' (assist: ' + helper.name + ')' : '') + '!', m.minute);
       } else {
-        if (Math.random() < .7) stats.onTarget++;
+        if (Math.random() < .7) { stats.onTarget++; if (m.playerStats[shooterId]) m.playerStats[shooterId].rating += 0.08; }
         if (Math.random() < .45) {
           const saveStats = side === 'home' ? m.awayStats : m.homeStats;
           saveStats.saves++;
+          if (gk?.id && m.playerStats[gk.id]) { m.playerStats[gk.id].saves++; m.playerStats[gk.id].rating = Math.min(10, m.playerStats[gk.id].rating + 0.12); }
           addEvent(m, 'save', opp.id, gk?.id, (gk?.name || 'Goalkeeper') + ' makes the save.', m.minute);
         } else {
           addEvent(m, 'shot', own.id, shooter?.id, (shooter?.name || own.name) + ' shoots off target.', m.minute);
