@@ -386,11 +386,12 @@ function makeMatch(home, away, fixtureId, live = false, preMatch = false) {
     possession: 50,
     homePlan: hp,
     awayPlan: ap,
-    homeStats: { shots: 0, onTarget: 0, saves: 0, passes: 0, tackles: 0 },
-    awayStats: { shots: 0, onTarget: 0, saves: 0, passes: 0, tackles: 0 },
-    playerStats: Object.fromEntries([...hp.startingXI, ...ap.startingXI].map(id => [id, { goals: 0, assists: 0, shots: 0, passes: 0, saves: 0, rating: 6.0 }])),
+    homeStats: { shots: 0, onTarget: 0, saves: 0, passes: 0, tackles: 0, interceptions: 0, dribbles: 0, keyPasses: 0 },
+    awayStats: { shots: 0, onTarget: 0, saves: 0, passes: 0, tackles: 0, interceptions: 0, dribbles: 0, keyPasses: 0 },
+    playerStats: Object.fromEntries([...hp.startingXI, ...ap.startingXI].map(id => [id, { goals: 0, assists: 0, shots: 0, passes: 0, saves: 0, tackles: 0, interceptions: 0, dribbles: 0, keyPasses: 0, rating: 6.0 }])),
     startedAt: now(),
-    updatedAt: now()
+    updatedAt: now(),
+    liveState: { ball:{x:50,y:50}, possession:'home', action:'kickoff', actionPlayerId:null, targetPlayerId:null, from:{x:50,y:50}, to:{x:50,y:50}, players:Object.fromEntries([...hp.startingXI,...ap.startingXI].map((id,i)=>[id,{x:i<5?[50,28,72,50,50][i]:[50,72,28,50,50][i-5],y:i<5?[88,68,68,45,20][i]:[12,32,32,55,80][i-5]}])), updatedAt:now() }
   };
 }
 
@@ -496,78 +497,58 @@ function maybeAdvanceLeague(l) {
 function tickMatch(m) {
   if (m.status !== 'live') return;
   m.minute++;
-  const h = club(m.homeClubId), a = club(m.awayClubId);
-  const hp = m.homePlan.tactics, ap = m.awayPlan.tactics;
-  const homePlayers = clubPlayers(h), awayPlayers = clubPlayers(a);
-  const hs = homePlayers.reduce((s, p) => s + p.overall * (p.fitness / 100), 0) / Math.max(1, homePlayers.length);
-  const as = awayPlayers.reduce((s, p) => s + p.overall * (p.fitness / 100), 0) / Math.max(1, awayPlayers.length);
-  m.possession = Math.max(20, Math.min(80, Math.round(50 + (hp.passing - ap.passing) * .16 + (hs - as) * .7)));
-  m.homeStats.passes += 2 + Math.floor(Math.random() * 5);
-  m.awayStats.passes += 2 + Math.floor(Math.random() * 5);
-  for (const sidePlan of [m.homePlan, m.awayPlan]) for (const pid of sidePlan.startingXI) if (m.playerStats[pid]) m.playerStats[pid].passes += 1 + Math.floor(Math.random() * 3);
-  for (const side of ['home', 'away']) {
-    const own = side === 'home' ? h : a;
-    const opp = side === 'home' ? a : h;
-    const plan = side === 'home' ? m.homePlan : m.awayPlan;
-    const stats = side === 'home' ? m.homeStats : m.awayStats;
-    const other = side === 'home' ? ap : hp;
-    const ownStr = side === 'home' ? hs : as;
-    const oppStr = side === 'home' ? as : hs;
-    const mentalityBonus = plan.tactics.mentality === 'Attacking' ? .025 : plan.tactics.mentality === 'Defensive' ? -.015 : 0;
-    const chance = Math.max(.018, Math.min(.15, .055 + (ownStr - oppStr) * .002 + (plan.tactics.pressing - other.pressing) * .00035 + mentalityBonus));
-    if (Math.random() < chance) {
-      stats.shots++;
-      const attackers = plan.startingXI.map(player).filter(p => p && p.position !== 'GK');
-      const shooter = attackers[Math.floor(Math.random() * attackers.length)] || player(plan.startingXI[0]);
-      const shooterId = shooter?.id;
-      if (m.playerStats[shooterId]) m.playerStats[shooterId].shots++;
-      const gkId = (side === 'home' ? m.awayPlan.startingXI : m.homePlan.startingXI)
-        .map(player).find(p => p?.position === 'GK')?.id;
-      const gk = player(gkId);
-      const goalChance = .24 + (shooter?.shooting || 60) / 430 - (gk?.overall || 65) / 850;
-      if (Math.random() < goalChance) {
-        if (side === 'home') m.homeScore++; else m.awayScore++;
-        stats.onTarget++;
-        if (m.playerStats[shooterId]) { m.playerStats[shooterId].goals++; m.playerStats[shooterId].rating = Math.min(10, m.playerStats[shooterId].rating + 0.9); }
-        const helpers = attackers.filter(p => p.id !== shooterId);
-        const helper = helpers.length && Math.random() < .72 ? helpers[Math.floor(Math.random() * helpers.length)] : null;
-        if (helper && m.playerStats[helper.id]) { m.playerStats[helper.id].assists++; m.playerStats[helper.id].rating = Math.min(10, m.playerStats[helper.id].rating + 0.35); }
-        addEvent(m, 'goal', own.id, shooterId, own.name + ' score — ' + (shooter?.name || 'attacker') + (helper ? ' (assist: ' + helper.name + ')' : '') + '!', m.minute);
-      } else {
-        if (Math.random() < .7) { stats.onTarget++; if (m.playerStats[shooterId]) m.playerStats[shooterId].rating += 0.08; }
-        if (Math.random() < .45) {
-          const saveStats = side === 'home' ? m.awayStats : m.homeStats;
-          saveStats.saves++;
-          if (gk?.id && m.playerStats[gk.id]) { m.playerStats[gk.id].saves++; m.playerStats[gk.id].rating = Math.min(10, m.playerStats[gk.id].rating + 0.12); }
-          addEvent(m, 'save', opp.id, gk?.id, (gk?.name || 'Goalkeeper') + ' makes the save.', m.minute);
-        } else {
-          addEvent(m, 'shot', own.id, shooter?.id, (shooter?.name || own.name) + ' shoots off target.', m.minute);
-        }
-      }
-    }
+  const h=club(m.homeClubId), a=club(m.awayClubId);
+  const hp=m.homePlan.tactics||{}, ap=m.awayPlan.tactics||{};
+  const homeXI=m.homePlan.startingXI.map(player).filter(Boolean), awayXI=m.awayPlan.startingXI.map(player).filter(Boolean);
+  const hs=homeXI.reduce((s,p)=>s+p.overall*(p.fitness/100),0)/Math.max(1,homeXI.length);
+  const as=awayXI.reduce((s,p)=>s+p.overall*(p.fitness/100),0)/Math.max(1,awayXI.length);
+  m.possession=Math.max(20,Math.min(80,Math.round(50+(hp.passing-ap.passing)*.14+(hs-as)*.65)));
+  const side=m.liveState.possession==='home'?'home':'away';
+  const ownPlan=side==='home'?m.homePlan:m.awayPlan, oppPlan=side==='home'?m.awayPlan:m.homePlan;
+  const own=side==='home'?h:a, opp=side==='home'?a:h;
+  const ownPlayers=side==='home'?homeXI:awayXI, oppPlayers=side==='home'?awayXI:homeXI;
+  const stats=side==='home'?m.homeStats:m.awayStats, oppStats=side==='home'?m.awayStats:m.homeStats;
+  const attacker=ownPlayers.filter(p=>p.position!=='GK').sort((x,y)=>(y.dribbling||60)+(y.passing||60)-(x.dribbling||60)-(x.passing||60))[Math.floor(Math.random()*Math.max(1,Math.min(3,ownPlayers.length-1)))]||ownPlayers[0];
+  const receiver=ownPlayers.filter(p=>p.id!==attacker?.id&&p.position!=='GK')[Math.floor(Math.random()*Math.max(1,ownPlayers.length-1))]||ownPlayers[0];
+  const defender=oppPlayers.filter(p=>p.position!=='GK').sort((x,y)=>(y.defending||60)-(x.defending||60))[Math.floor(Math.random()*Math.max(1,oppPlayers.length-1))]||oppPlayers[0];
+  const coords=m.liveState.players||{};
+  const setPos=(p,x,y)=>{if(p)coords[p.id]={x:Math.max(5,Math.min(95,x)),y:Math.max(5,Math.min(95,y))}};
+  const getPos=p=>coords[p?.id]||{x:50,y:50};
+  const base=getPos(attacker), recv=getPos(receiver);
+  const roll=Math.random();
+  let action='pass', actionText='';
+  if(roll<.46){
+    stats.passes++; if(attacker&&m.playerStats[attacker.id])m.playerStats[attacker.id].passes++;
+    setPos(attacker,base.x+(side==='home'?5:-5),base.y+(side==='home'?-4:4)); setPos(receiver,recv.x+(side==='home'?3:-3),recv.y+(side==='home'?-2:2));
+    m.liveState.from=getPos(attacker); m.liveState.to=getPos(receiver); m.liveState.ball={...m.liveState.to}; m.liveState.possession=side; m.liveState.action='pass'; m.liveState.actionPlayerId=attacker?.id||null; m.liveState.targetPlayerId=receiver?.id||null;
+    actionText=(attacker?.name||own.name)+' passes to '+(receiver?.name||'a teammate')+'.';
+  } else if(roll<.66){
+    stats.dribbles++; if(attacker&&m.playerStats[attacker.id])m.playerStats[attacker.id].dribbles++;
+    const success=Math.random()<.72+(attacker?.dribbling||60)/500-(defender?.defending||60)/700;
+    setPos(attacker,base.x+(side==='home'?7:-7),base.y+(side==='home'?-6:6)); m.liveState.ball={...getPos(attacker)}; m.liveState.action=success?'dribble':'tackle';m.liveState.actionPlayerId=attacker?.id||null;m.liveState.targetPlayerId=defender?.id||null;
+    if(success){action='dribble';actionText=(attacker?.name||'Attacker')+' beats '+(defender?.name||'the defender')+' with a dribble.';}
+    else{oppStats.tackles++;if(defender&&m.playerStats[defender.id])m.playerStats[defender.id].tackles++;m.liveState.possession=side==='home'?'away':'home';action='tackle';actionText=(defender?.name||'Defender')+' wins the tackle.';}
+  } else if(roll<.84){
+    stats.shots++;if(attacker&&m.playerStats[attacker.id])m.playerStats[attacker.id].shots++;
+    const targetX=50+(Math.random()*20-10), targetY=side==='home'?5:95; m.liveState.from=getPos(attacker);m.liveState.to={x:targetX,y:targetY};m.liveState.ball={x:targetX,y:targetY};m.liveState.action='shot';m.liveState.actionPlayerId=attacker?.id||null;m.liveState.targetPlayerId=null;
+    const gk=oppPlayers.find(p=>p.position==='GK'), goalChance=Math.max(.06,Math.min(.42,.17+(attacker?.shooting||60)/500-(gk?.overall||65)/900+(hp.mentality==='Attacking'?.06:0)));
+    if(Math.random()<goalChance){if(side==='home')m.homeScore++;else m.awayScore++;stats.onTarget++;if(attacker&&m.playerStats[attacker.id]){m.playerStats[attacker.id].goals++;m.playerStats[attacker.id].rating=Math.min(10,m.playerStats[attacker.id].rating+.9)};const assister=receiver&&Math.random()<.7?receiver:null;if(assister&&m.playerStats[assister.id]){m.playerStats[assister.id].assists++;m.playerStats[assister.id].keyPasses++;m.playerStats[assister.id].rating=Math.min(10,m.playerStats[assister.id].rating+.3)}m.liveState.action='goal';actionText='GOAL! '+(attacker?.name||'Attacker')+' scores for '+own.name+(assister?' — assist '+assister.name:'')+'!';}
+    else if(Math.random()<.72){stats.onTarget++;if(gk&&m.playerStats[gk.id]){m.playerStats[gk.id].saves++;m.playerStats[gk.id].rating=Math.min(10,m.playerStats[gk.id].rating+.12)}actionText=(attacker?.name||'Attacker')+' shoots — saved by '+(gk?.name||'the goalkeeper')+'.';}
+    else actionText=(attacker?.name||'Attacker')+' shoots wide.'; action='shot';
+  } else {
+    const intercept=Math.random()<.7; if(intercept){oppStats.interceptions++;if(defender&&m.playerStats[defender.id])m.playerStats[defender.id].interceptions++;m.liveState.possession=side==='home'?'away':'home';action='interception';actionText=(defender?.name||'Defender')+' intercepts the pass.';}else{stats.keyPasses++;if(attacker&&m.playerStats[attacker.id])m.playerStats[attacker.id].keyPasses++;action='chance';actionText=(attacker?.name||'Attacker')+' creates a dangerous chance.';}
   }
-  for (const p of [...m.homePlan.startingXI, ...m.awayPlan.startingXI].map(player)) {
-    if (p) {
-      p.fitness = Math.max(0, p.fitness - .08);
-      p.fatigue = Math.min(100, p.fatigue + .13);
-    }
-  }
-  if (m.minute === 45) { m.phase = 'halftime'; m.status = 'halftime'; addEvent(m, 'halftime', null, null, 'Half-time. Tactical changes are available.'); }
-  if (m.minute === 46) { m.phase = 'second_half'; addEvent(m, 'kickoff', null, null, 'Second half begins.'); }
-  if (m.minute === 90) { m.phase = 'stoppage'; addEvent(m, 'stoppage', null, null, 'Stoppage time.'); }
-  if (m.minute >= 93) {
-    finishMatch(m);
-    const l = league(m.leagueId);
-    if (l) {
-      autoSimCurrentBots(l);
-      maybeAdvanceLeague(l);
-    }
-    save();
-    return;
-  }
-  m.updatedAt = now();
+  m.liveState.updatedAt=now();
+  addEvent(m,action,own.id,attacker?.id||null,actionText,m.minute);
+  for(const p of [...homeXI,...awayXI]){p.fitness=Math.max(0,p.fitness-.08);p.fatigue=Math.min(100,p.fatigue+.13);}
+  const allStats=[...m.homePlan.startingXI,...m.awayPlan.startingXI].map(player).filter(Boolean);
+  for(const p of allStats){const ps=m.playerStats[p.id];if(ps)ps.rating=Math.max(4,Math.min(10,6+(ps.goals*1.2)+(ps.assists*.5)+(ps.passes*.015)+(ps.tackles*.03)+(ps.interceptions*.03)));}
+  if(m.minute===45){m.phase='halftime';m.status='halftime';addEvent(m,'halftime',null,null,'Half-time. Tactical changes are available.',m.minute);}
+  if(m.minute===46){m.phase='second_half';addEvent(m,'kickoff',null,null,'Second half begins.',m.minute);}
+  if(m.minute===90){m.phase='stoppage';addEvent(m,'stoppage',null,null,'Stoppage time.',m.minute);}
+  if(m.minute>=93){finishMatch(m);const l=league(m.leagueId);if(l){autoSimCurrentBots(l);maybeAdvanceLeague(l)}save();return;}
+  m.updatedAt=now();
 }
-
 function syncLiveMatch(m) {
   if (!m || m.status !== 'live') return false;
   const target = Math.min(93, Math.max(0, Math.floor((Date.now() - new Date(m.startedAt).getTime()) / 1000)));
