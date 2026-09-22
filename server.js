@@ -496,6 +496,24 @@ function maybeAdvanceLeague(l) {
 
 function tickMatch(m) {
   if (m.status !== 'live') return;
+  const preState=m.liveState||{};
+  if(preState.action==='goal'){
+    if(now()-(preState.actionStartedAt||0)<900) return;
+    const kickoffClub=(preState.goal?.clubId===m.homeClubId?'away':'home');
+    const kickoffPlayers=kickoffClub==='home'?m.homePlan.startingXI.map(player).filter(Boolean):m.awayPlan.startingXI.map(player).filter(Boolean);
+    const kickoffPlayer=kickoffPlayers.find(p=>String(p.position||'').toUpperCase().includes('MID'))||kickoffPlayers.find(p=>!String(p.position||'').toUpperCase().includes('GK'))||kickoffPlayers[0];
+    preState.possession=kickoffClub;
+    preState.ballOwnerId=kickoffPlayer?.id||null;
+    preState.ball={x:50,y:50};
+    preState.from={x:50,y:50};
+    preState.to={x:50,y:50};
+    preState.action='kickoff';
+    preState.actionPlayerId=kickoffPlayer?.id||null;
+    preState.targetPlayerId=null;
+    preState.goal=null;
+    preState.actionStartedAt=now();
+    addEvent(m,'kickoff',kickoffClub==='home'?m.homeClubId:m.awayClubId,kickoffPlayer?.id||null,'Kick-off after the goal.',m.minute);
+  }
   m.minute++;
   const home=club(m.homeClubId), away=club(m.awayClubId);
   const homePlayers=m.homePlan.startingXI.map(player).filter(Boolean);
