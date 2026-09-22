@@ -146,7 +146,7 @@ function randomName() {
 
 const REAL_PLAYERS = [
 {name:'Lionel Messi',position:'FWD',nationality:'Argentina',age:39,foot:'Left',overall:91,pace:85,shooting:95,passing:96,dribbling:97,defending:38,physical:65,imageUrl:'https://commons.wikimedia.org/wiki/Special:FilePath/Lionel_Messi_Argentina_v_Egypt_7_July_2026-050.jpg?width=330'},
-{name:'Cristiano Ronaldo',position:'FWD',nationality:'Portugal',age:41,foot:'Right',overall:88,pace:82,shooting:94,passing:81,dribbling:85,defending:35,physical:77,imageUrl:'https://commons.wikimedia.org/wiki/Special:FilePath/Mohamed_Salah_with_UEFA_Super_Cup.jpg?width=330'},
+{name:'Cristiano Ronaldo',position:'FWD',nationality:'Portugal',age:41,foot:'Right',overall:88,pace:82,shooting:94,passing:81,dribbling:85,defending:35,physical:77,imageUrl:'https://commons.wikimedia.org/wiki/Special:FilePath/Christiano_Ronaldo_at_world_cup_match_2026.jpg?width=330'},
 {name:'Kylian Mbappe',position:'FWD',nationality:'France',age:27,foot:'Right',overall:92,pace:97,shooting:91,passing:84,dribbling:93,defending:39,physical:80},
 {name:'Erling Haaland',position:'FWD',nationality:'Norway',age:26,foot:'Left',overall:91,pace:88,shooting:96,passing:79,dribbling:85,defending:45,physical:93},
 {name:'Mohamed Salah',position:'FWD',nationality:'Egypt',age:34,foot:'Left',overall:88,pace:89,shooting:90,passing:83,dribbling:90,defending:45,physical:72},
@@ -164,7 +164,7 @@ const REAL_PLAYERS = [
 ];
 
 function newPlayer(clubId, position, bot = false) {
-  const candidates = REAL_PLAYERS.filter(x => x.position === position);
+  const ownedNames = new Set(clubPlayers(clubId).map(x => x.name));\n  let candidates = REAL_PLAYERS.filter(x => x.position === position && !ownedNames.has(x.name));\n  if (!candidates.length) candidates = REAL_PLAYERS.filter(x => x.position === position);
   const base = candidates[Math.floor(Math.random() * candidates.length)] || {name:randomName(),position,overall:72,pace:70,shooting:65,passing:65,dribbling:65,defending:65,physical:65,nationality:'International',age:24,foot:'Right'};
   const p = {
     id: makeId('pl'), clubId, name: base.name, position: base.position, nationality: base.nationality,
