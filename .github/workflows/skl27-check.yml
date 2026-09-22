@@ -1,4 +1,4 @@
-name: SKL27 checks
+name: SKL27 frontend compile
 on:
   push:
     branches: [main]
@@ -12,5 +12,17 @@ jobs:
         with:
           node-version: 22
       - run: node --check server.js
-      - run: npx --yes esbuild skl27.js --loader:js=jsx --outfile=/tmp/skl27-check.js
-      - run: test -s /tmp/skl27-check.js
+      - name: Compile frontend
+        run: |
+          set +e
+          npx --yes esbuild skl27.js --loader:js=jsx --outfile=/tmp/skl27-check.js > /tmp/esbuild.log 2>&1
+          code=$?
+          cat /tmp/esbuild.log
+          echo "ESBUILD_EXIT=$code"
+          exit $code
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skl27-compile-log
+          path: /tmp/esbuild.log
