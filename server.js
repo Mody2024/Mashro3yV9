@@ -477,10 +477,10 @@ function tickMatch(m) {
     const chance = Math.max(.018, Math.min(.15, .055 + (ownStr - oppStr) * .002 + (plan.tactics.pressing - other.pressing) * .00035 + mentalityBonus));
     if (Math.random() < chance) {
       stats.shots++;
-      if (m.playerStats[shooterId]) m.playerStats[shooterId].shots++;
       const attackers = plan.startingXI.map(player).filter(p => p && p.position !== 'GK');
       const shooter = attackers[Math.floor(Math.random() * attackers.length)] || player(plan.startingXI[0]);
       const shooterId = shooter?.id;
+      if (m.playerStats[shooterId]) m.playerStats[shooterId].shots++;
       const gkId = (side === 'home' ? m.awayPlan.startingXI : m.homePlan.startingXI)
         .map(player).find(p => p?.position === 'GK')?.id;
       const gk = player(gkId);
