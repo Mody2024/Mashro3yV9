@@ -497,147 +497,142 @@ function maybeAdvanceLeague(l) {
 function tickMatch(m) {
   if (m.status !== 'live') return;
   m.minute++;
+  const home=club(m.homeClubId), away=club(m.awayClubId);
   const homePlayers=m.homePlan.startingXI.map(player).filter(Boolean);
   const awayPlayers=m.awayPlan.startingXI.map(player).filter(Boolean);
-  const homeClub=club(m.homeClubId), awayClub=club(m.awayClubId);
   const state=m.liveState||(m.liveState={});
-  state.players=state.players||{};
-  const clamp=(v,a=4,b=96)=>Math.max(a,Math.min(b,v));
-  if(state.engineVersion!==2){
-    state.engineVersion=2;
-    state.ball={x:50,y:50};
-    state.possession='home';
-    state.action='kickoff';
-    state.actionPlayerId=null;
-    state.targetPlayerId=null;
-    state.from={x:50,y:50};
-    state.to={x:50,y:50};
-    state.players={};
-  }
-  const role=(p)=>String(p?.position||'').toUpperCase().includes('GK')?'GK':String(p?.position||'').toUpperCase().includes('DEF')?'DEF':String(p?.position||'').toUpperCase().includes('MID')?'MID':'ATT';
+  const clamp=(v,a=3,b=97)=>Math.max(a,Math.min(b,v));
+  const role=p=>String(p?.position||'').toUpperCase().includes('GK')?'GK':String(p?.position||'').toUpperCase().includes('DEF')?'DEF':String(p?.position||'').toUpperCase().includes('MID')?'MID':'ATT';
   const anchors={
-    home:[[50,90],[34,70],[66,70],[50,52],[50,29]],
-    away:[[50,10],[66,30],[34,30],[50,48],[50,71]]
+    home:[[50,90],[33,68],[67,68],[50,51],[50,28]],
+    away:[[50,10],[67,32],[33,32],[50,49],[50,72]]
   };
-  const ensureShape=(arr,side)=>{
+  if(state.engineVersion!==3){
+    state.engineVersion=3;
+    state.players={};
+    homePlayers.slice(0,5).forEach((p,i)=>state.players[p.id]={x:anchors.home[i][0],y:anchors.home[i][1]});
+    awayPlayers.slice(0,5).forEach((p,i)=>state.players[p.id]={x:anchors.away[i][0],y:anchors.away[i][1]});
+    state.possession='home';
+    state.ballOwnerId=homePlayers[4]?.id||homePlayers[0]?.id||null;
+    state.ball={...state.players[state.ballOwnerId]||{x:50,y:50}};
+    state.from={...state.ball}; state.to={...state.ball};
+    state.action='kickoff'; state.actionPlayerId=state.ballOwnerId; state.targetPlayerId=null;
+  }
+  const allSides=[['home',homePlayers,anchors.home],['away',awayPlayers,anchors.away]];
+  for(const [side,arr,shape] of allSides){
     arr.slice(0,5).forEach((p,i)=>{
-      if(!state.players[p.id]) state.players[p.id]={x:anchors[side][i][0],y:anchors[side][i][1]};
+      const cur=state.players[p.id]||{x:shape[i][0],y:shape[i][1]};
+      const base=shape[i];
+      const ball=state.ball||{x:50,y:50};
+      const dir=side==='home'?-1:1;
+      const roleBias=role(p)==='ATT'?dir*6:role(p)==='MID'?dir*2:role(p)==='DEF'?dir*-2:0;
+      const possessionPush=state.possession===side?dir*4:-dir*1.5;
+      const target={x:clamp(base[0]+(ball.x-50)*0.16),y:clamp(base[1]+(ball.y-base[1])*0.08+roleBias+possessionPush)};
+      const pace=(Number(p.pace)||65)*(Number(p.fitness||100)/100);
+      const maxStep=0.55+Math.max(0,pace-45)/140;
+      const dx=target.x-cur.x,dy=target.y-cur.y,len=Math.hypot(dx,dy)||1;
+      state.players[p.id]={x:clamp(cur.x+(dx/len)*Math.min(len,maxStep)),y:clamp(cur.y+(dy/len)*Math.min(len,maxStep))};
     });
-  };
-  ensureShape(homePlayers,'home'); ensureShape(awayPlayers,'away');
-  let ball=state.ball||{x:50,y:50};
-  let possession=state.possession||'home';
-  const hStrength=homePlayers.reduce((s,p)=>s+(Number(p.overall)||60)*(Number(p.fitness||100)/100),0)/Math.max(1,homePlayers.length);
-  const aStrength=awayPlayers.reduce((s,p)=>s+(Number(p.overall)||60)*(Number(p.fitness||100)/100),0)/Math.max(1,awayPlayers.length);
-  const homePassing=(m.homePlan.tactics?.passing||50), awayPassing=(m.awayPlan.tactics?.passing||50);
-  m.possession=clamp(Math.round(50+(homePassing-awayPassing)*.18+(hStrength-aStrength)*.55),20,80);
-  if(state.lastActionMinute===m.minute) return;
-  state.lastActionMinute=m.minute;
+  }
 
-  const own=possession==='home'?homePlayers:awayPlayers;
-  const opp=possession==='home'?awayPlayers:homePlayers;
+  const getPos=id=>state.players[id]||{x:50,y:50};
+  const homeNonGK=homePlayers.filter(p=>role(p)!=='GK'), awayNonGK=awayPlayers.filter(p=>role(p)!=='GK');
+  const homeGK=homePlayers.find(p=>role(p)==='GK')||homePlayers[0], awayGK=awayPlayers.find(p=>role(p)==='GK')||awayPlayers[0];
+  let possession=state.possession==='away'?'away':'home';
+  let own=possession==='home'?homePlayers:awayPlayers, opp=possession==='home'?awayPlayers:homePlayers;
+  let ownNonGK=possession==='home'?homeNonGK:awayNonGK, oppNonGK=possession==='home'?awayNonGK:homeNonGK;
   const ownStats=possession==='home'?m.homeStats:m.awayStats;
   const oppStats=possession==='home'?m.awayStats:m.homeStats;
-  const ownClub=possession==='home'?homeClub:awayClub;
-  const direction=possession==='home'?-1:1;
-  const attackLine=possession==='home'?28:72;
-  const nonGK=own.filter(p=>role(p)!=='GK');
-  const defenders=opp.filter(p=>role(p)!=='GK');
-  const distance=(p,q)=>Math.hypot((state.players[p?.id]?.x||50)-(state.players[q?.id]?.x||50),(state.players[p?.id]?.y||50)-(state.players[q?.id]?.y||50));
-  const nearest=(list,target,exclude)=>list.filter(p=>p&&p.id!==exclude).sort((a,b)=>distance(a,target)-distance(b,target))[0];
-  const withRating=(p,key)=>Number(p?.[key]||p?.overall||60);
-
-  // Maintain a recognizable 2-1-1 team shape around the ball instead of random teleportation.
-  for(const [side,arr] of [['home',homePlayers],['away',awayPlayers]]){
-    const dir=side==='home'?-1:1;
-    arr.slice(0,5).forEach((p,i)=>{
-      const base=anchors[side][i];
-      const influence=(ball.y-base[1])*.13;
-      const sideBias=i===1?-3:i===2?3:0;
-      const possessionPush=(possession===side?dir*5:-dir*2);
-      const target={x:clamp(base[0]+(ball.x-50)*.16+sideBias),y:clamp(base[1]+influence+possessionPush)};
-      const cur=state.players[p.id]||target;
-      const speed=Math.max(1.5,Math.min(7,(withRating(p,'pace')/18)))*(p.fitness||100)/100;
-      const maxStep=.9+speed*.16;
-      const dx=target.x-cur.x,dy=target.y-cur.y,len=Math.hypot(dx,dy)||1;
-      state.players[p.id]={x:clamp(cur.x+dx/len*Math.min(len,maxStep)),y:clamp(cur.y+dy/len*Math.min(len,maxStep))};
-    });
-  }
-
-  const actor=nonGK.slice().sort((a,b)=>{
-    const pa=state.players[a.id]||{x:50,y:50}, pb=state.players[b.id]||{x:50,y:50};
-    return Math.abs(pa.y-(possession==='home'?ball.y:ball.y))+Math.abs(pa.x-ball.x)-Math.abs(pb.x-ball.x)-Math.abs(pb.y-ball.y);
-  })[0]||own[0];
-  const receiver=nearest(nonGK,actor,actor?.id)||nonGK[0];
-  const defender=nearest(defenders,actor)||defenders[0];
-  const ap=state.players[actor?.id]||{x:ball.x,y:ball.y};
-  const rp=state.players[receiver?.id]||{x:50,y:50};
-  const dp=state.players[defender?.id]||{x:50,y:50};
-  const pressure=Math.max(0,100-(Math.hypot(ap.x-dp.x,ap.y-dp.y)*2));
-  const attackQuality=(withRating(actor,'passing')+withRating(actor,'dribbling')+withRating(actor,'shooting'))/3;
+  const ownClub=possession==='home'?home:away;
+  const oppGK=possession==='home'?awayGK:homeGK;
+  const dir=possession==='home'?-1:1;
+  const distance=(a,b)=>Math.hypot(getPos(a.id).x-getPos(b.id).x,getPos(a.id).y-getPos(b.id).y);
+  let carrier=own.find(p=>p.id===state.ballOwnerId)||ownNonGK.slice().sort((a,b)=>distance(a,{id:'__ball'})-distance(b,{id:'__ball'}))[0]||own[0];
+  if(!carrier) return;
+  state.ballOwnerId=carrier.id;
+  const carrierPos=getPos(carrier.id);
+  const nearestOpp=oppNonGK.slice().sort((a,b)=>Math.hypot(getPos(a.id).x-carrierPos.x,getPos(a.id).y-carrierPos.y)-Math.hypot(getPos(b.id).x-carrierPos.x,getPos(b.id).y-carrierPos.y))[0]||opp[0];
+  const openTeammates=ownNonGK.filter(p=>p.id!==carrier.id).sort((a,b)=>{
+    const ap=getPos(a.id),bp=getPos(b.id);
+    return (Math.abs((bp.y-(dir<0?15:85)))+Math.abs(bp.x-50))-(Math.abs((ap.y-(dir<0?15:85)))+Math.abs(ap.x-50));
+  });
+  const receiver=openTeammates[0]||carrier;
+  const carrierSkill=(carrier.passing+carrier.dribbling+carrier.shooting)/3;
+  const pressure=nearestOpp?Math.max(0,1-Math.hypot(getPos(nearestOpp.id).x-carrierPos.x,getPos(nearestOpp.id).y-carrierPos.y)/28):0;
   const roll=Math.random();
-  let action='pass',text='';
-  if(roll<.50){
-    const accuracy=.72+(withRating(actor,'passing')-60)/300-pressure/900;
-    const completed=Math.random()<Math.max(.35,Math.min(.94,accuracy));
+  let nextPossession=possession,action='pass',text='',from={...carrierPos},to={...carrierPos};
+
+  // Every tick is one possession decision. The decision updates the same ball/player state
+  // that the frontend renders, so score, event feed, player movement and ball movement stay coupled.
+  if(roll<0.46){
+    const targetPos=getPos(receiver.id);
+    const passSuccess=Math.random()<Math.max(0.38,Math.min(0.96,0.68+(carrier.passing-65)/240-pressure*0.22+(receiver.passing-65)/500));
     ownStats.passes++;
-    if(m.playerStats[actor.id])m.playerStats[actor.id].passes++;
-    if(completed){
-      state.possession=possession;
-      state.from={...ap}; state.to={x:clamp(rp.x+direction*2),y:clamp(rp.y+((Math.random()*10)-5))};
-      state.ball={...state.to}; state.action='pass';state.actionPlayerId=actor.id;state.targetPlayerId=receiver.id;
-      state.ballVelocity={x:state.to.x-state.from.x,y:state.to.y-state.from.y};
-      text=actor.name+' passes to '+receiver.name+'.';
+    if(m.playerStats[carrier.id])m.playerStats[carrier.id].passes++;
+    from={...carrierPos}; to={x:clamp(targetPos.x+dir*2),y:clamp(targetPos.y+(Math.random()*6-3))};
+    if(passSuccess){
+      state.ballOwnerId=receiver.id; state.targetPlayerId=receiver.id; state.possession=possession; action='pass';
+      text=carrier.name+' passes to '+receiver.name+'.';
     }else{
-      const intercepted=Math.random()<.65;
-      state.from={...ap};state.to={x:clamp(dp.x),y:clamp(dp.y)};state.ball={...state.to};
-      if(intercepted){oppStats.interceptions++;if(m.playerStats[defender.id])m.playerStats[defender.id].interceptions++;state.possession=possession==='home'?'away':'home';possession=state.possession;action='interception';state.action='interception';state.actionPlayerId=defender.id;state.targetPlayerId=null;text=defender.name+' intercepts the pass.';}
-      else{text=actor.name+' misplaces the pass.';state.action='pass';state.actionPlayerId=actor.id;}
+      const intercepted=Math.random()<0.72 && nearestOpp;
+      if(intercepted){
+        state.ballOwnerId=nearestOpp.id; state.targetPlayerId=nearestOpp.id; nextPossession=possession==='home'?'away':'home'; state.possession=nextPossession; action='interception'; to=getPos(nearestOpp.id);
+        oppStats.interceptions++;if(m.playerStats[nearestOpp.id])m.playerStats[nearestOpp.id].interceptions++;
+        text=nearestOpp.name+' intercepts the pass.';
+      }else{
+        action='misplaced_pass';state.targetPlayerId=null;text=carrier.name+' misplaces the pass.';
+      }
     }
-  }else if(roll<.70){
-    const success=Math.random()<Math.max(.25,Math.min(.9,.55+(withRating(actor,'dribbling')-withRating(defender,'defending'))/220));
-    state.from={...ap};state.actionPlayerId=actor.id;state.targetPlayerId=defender?.id||null;
+  }else if(roll<0.69){
+    const success=Math.random()<Math.max(.28,Math.min(.9,.5+(carrier.dribbling-nearestOpp?.defending||55)/240-pressure*.12));
+    from={...carrierPos};to={x:clamp(carrierPos.x+dir*(6+carrier.pace/50)),y:clamp(carrierPos.y+(Math.random()*10-5))};
     if(success){
-      state.to={x:clamp(ap.x+direction*8),y:clamp(ap.y+(Math.random()*8-4))};state.ball={...state.to};state.action='dribble';state.possession=possession;
-      if(m.playerStats[actor.id])m.playerStats[actor.id].dribbles++;ownStats.dribbles++;text=actor.name+' beats '+defender.name+' with a dribble.';
-    }else{
-      state.to={...dp};state.ball={...dp};state.action='tackle';state.possession=possession==='home'?'away':'home';possession=state.possession;
-      oppStats.tackles++;if(m.playerStats[defender.id])m.playerStats[defender.id].tackles++;text=defender.name+' wins the tackle.';
+      state.ballOwnerId=carrier.id;state.targetPlayerId=nearestOpp?.id||null;state.possession=possession;action='dribble';text=carrier.name+' drives forward past '+(nearestOpp?.name||'the defender')+'.';ownStats.dribbles++;
+      if(m.playerStats[carrier.id])m.playerStats[carrier.id].dribbles++;
+      state.players[carrier.id]={x:to.x,y:to.y};
+    }else if(nearestOpp){
+      state.ballOwnerId=nearestOpp.id;nextPossession=possession==='home'?'away':'home';state.possession=nextPossession;action='tackle';to=getPos(nearestOpp.id);text=nearestOpp.name+' wins the tackle.';oppStats.tackles++;if(m.playerStats[nearestOpp.id])m.playerStats[nearestOpp.id].tackles++;
     }
-  }else if(roll<.91){
-    const distanceToGoal=possession==='home'?ap.y:100-ap.y;
-    const shootingZone=distanceToGoal<38;
-    if(shootingZone||Math.random()<.45){
-      ownStats.shots++;if(m.playerStats[actor.id])m.playerStats[actor.id].shots++;
-      const target={x:clamp(50+(Math.random()*18-9)),y:possession==='home'?4:96};
-      state.from={...ap};state.to=target;state.ball={...target};state.action='shot';state.actionPlayerId=actor.id;state.targetPlayerId=null;
-      const gk=opp.find(p=>role(p)==='GK')||opp[0];
-      const xg=Math.max(.025,Math.min(.55,.07+(withRating(actor,'shooting')-50)/260+(shootingZone?.08:0)-Math.abs(target.x-50)/180-(withRating(gk,'overall')-60)/500));
+  }else if(roll<0.9){
+    const goalY=possession==='home'?4:96;
+    const distToGoal=Math.abs(carrierPos.y-goalY);
+    if(distToGoal<42){
+      ownStats.shots++;if(m.playerStats[carrier.id])m.playerStats[carrier.id].shots++;
+      const target={x:clamp(50+(Math.random()*16-8)),y:goalY};
+      from={...carrierPos};to=target;action='shot';state.targetPlayerId=null;
+      const xg=Math.max(.03,Math.min(.5,.08+(carrier.shooting-55)/260+(42-distToGoal)/500+(carrier.passing-60)/700-(oppGK.overall-70)/650));
       if(Math.random()<xg){
         if(possession==='home')m.homeScore++;else m.awayScore++;ownStats.onTarget++;
-        m.playerStats[actor.id].goals++;m.playerStats[actor.id].rating=Math.min(10,m.playerStats[actor.id].rating+.9);
-        state.action='goal';state.goal={minute:m.minute,scorerId:actor.id,clubId:ownClub.id};text='GOAL! '+actor.name+' scores for '+ownClub.name+'!';
+        if(m.playerStats[carrier.id]){m.playerStats[carrier.id].goals++;m.playerStats[carrier.id].rating=Math.min(10,m.playerStats[carrier.id].rating+.95);}
+        const assist=receiver!==carrier && Math.random()<.65?receiver:null;
+        if(assist&&m.playerStats[assist.id]){m.playerStats[assist.id].assists++;m.playerStats[assist.id].keyPasses++;m.playerStats[assist.id].rating=Math.min(10,m.playerStats[assist.id].rating+.3);}
+        state.ballOwnerId=null;action='goal';text='GOAL! '+carrier.name+' scores for '+ownClub.name+(assist?' — assist '+assist.name:'')+'.';
       }else if(Math.random()<.72){
-        ownStats.onTarget++;if(gk&&m.playerStats[gk.id]){m.playerStats[gk.id].saves++;m.playerStats[gk.id].rating=Math.min(10,m.playerStats[gk.id].rating+.15)}text=actor.name+' shoots — '+(gk?.name||'the goalkeeper')+' makes the save.';
-      }else{text=actor.name+' shoots wide.';}
+        ownStats.onTarget++;state.ballOwnerId=oppGK.id;state.possession=possession==='home'?'away':'home';nextPossession=state.possession;action='save';text=carrier.name+' shoots — '+oppGK.name+' saves.';
+        if(m.playerStats[oppGK.id]){m.playerStats[oppGK.id].saves++;m.playerStats[oppGK.id].rating=Math.min(10,m.playerStats[oppGK.id].rating+.14);}
+      }else{
+        state.ballOwnerId=null;action='shot_wide';text=carrier.name+' shoots wide.';
+      }
     }else{
-      state.action='through_ball';state.actionPlayerId=actor.id;state.targetPlayerId=receiver?.id||null;state.from={...ap};state.to={x:clamp(rp.x+direction*10),y:clamp(rp.y)};state.ball={...state.to};text=actor.name+' plays a through ball to '+receiver.name+'.';ownStats.keyPasses++;
+      const runTarget={x:clamp((receiver?getPos(receiver.id).x:50)+dir*8),y:clamp((receiver?getPos(receiver.id).y:carrierPos.y)+dir*5)};
+      from={...carrierPos};to=runTarget;state.ballOwnerId=receiver.id;action='through_ball';state.targetPlayerId=receiver.id;text=carrier.name+' threads a ball into space for '+receiver.name+'.';ownStats.keyPasses++;
     }
   }else{
-    state.action='press';state.actionPlayerId=defender?.id||null;state.targetPlayerId=actor?.id||null;state.from={...dp};state.to={...ap};state.ball={...ap};text=defender?.name+' closes down '+actor?.name+'.';
+    action='press';state.actionPlayerId=nearestOpp?.id||carrier.id;state.targetPlayerId=carrier.id;from=getPos(nearestOpp?.id||carrier.id);to=carrierPos;text=(nearestOpp?.name||'Defender')+' presses '+carrier.name+' and forces the play.';
   }
 
-  // Keep the ball with the player receiving the action; after a completed pass the next minute starts from there.
-  state.updatedAt=now();
-  addEvent(m,state.action,ownClub?.id||null,state.actionPlayerId,text,m.minute);
+  state.possession=nextPossession;
+  state.from={x:clamp(from.x),y:clamp(from.y)};state.to={x:clamp(to.x),y:clamp(to.y)};
+  state.ball=state.ballOwnerId?{...getPos(state.ballOwnerId)}:{x:clamp(to.x),y:clamp(to.y)};
+  state.action=action;state.actionPlayerId=carrier.id;state.actionStartedAt=now();state.actionDurationMs=850;state.updatedAt=now();
+  addEvent(m,action,ownClub.id,carrier.id,text,m.minute);
   for(const p of [...homePlayers,...awayPlayers]){
-    p.fitness=Math.max(0,p.fitness-.035);
-    p.fatigue=Math.min(100,p.fatigue+.06);
+    p.fitness=Math.max(0,p.fitness-.03);p.fatigue=Math.min(100,p.fatigue+.05);
     const ps=m.playerStats[p.id];
-    if(ps) ps.rating=Math.max(4,Math.min(10,6+ps.goals*1.2+ps.assists*.5+ps.passes*.012+ps.tackles*.03+ps.interceptions*.03+ps.saves*.05));
+    if(ps)ps.rating=Math.max(4,Math.min(10,6+ps.goals*1.2+ps.assists*.5+ps.passes*.01+ps.tackles*.025+ps.interceptions*.025+ps.dribbles*.015+ps.saves*.05));
   }
-  if(m.minute===45){m.phase='halftime';m.status='halftime';state.action='halftime';addEvent(m,'halftime',null,null,'Half-time — managers can change tactics and substitutions.',m.minute);}
-  if(m.minute===46){m.status='live';m.phase='second_half';state.action='kickoff';addEvent(m,'kickoff',null,null,'Second half begins.',m.minute);}
+  if(m.minute===45){m.phase='halftime';m.status='halftime';state.action='halftime';state.actionStartedAt=now();addEvent(m,'halftime',null,null,'Half-time — tactical changes and substitutions are available.',m.minute);}
+  if(m.minute===46){m.status='live';m.phase='second_half';state.action='kickoff';state.actionStartedAt=now();addEvent(m,'kickoff',null,null,'Second half begins.',m.minute);}
   if(m.minute===90){m.phase='stoppage';addEvent(m,'stoppage',null,null,'Stoppage time.',m.minute);}
   if(m.minute>=93){finishMatch(m);const l=league(m.leagueId);if(l){autoSimCurrentBots(l);maybeAdvanceLeague(l)}save();return;}
   m.updatedAt=now();
