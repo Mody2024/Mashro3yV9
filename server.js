@@ -799,6 +799,7 @@ async function api(req, res) {
         events: db.events.filter(e => e.matchId === m.id),
         home: club(m.homeClubId),
         away: club(m.awayClubId),
+        players: db.players.filter(p => p.clubId === m.homeClubId || p.clubId === m.awayClubId),
         serverTime: now()
       });
     }
