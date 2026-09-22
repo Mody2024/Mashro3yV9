@@ -870,4 +870,11 @@ async function boot() {
     console.error('[SKL27] Database startup failed:', err.message);
   }
 }
-boot();
+
+// Vercel imports this file as a serverless function. Only start a TCP server
+// when running directly with "node server.js" locally/on a traditional host.
+if (require.main === module) {
+  boot();
+} else {
+  module.exports = { api, loadDb };
+}
