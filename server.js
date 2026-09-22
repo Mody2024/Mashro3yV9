@@ -144,24 +144,36 @@ function randomName() {
     lastNames[Math.floor(Math.random() * lastNames.length)];
 }
 
+const REAL_PLAYERS = [
+{name:'Lionel Messi',position:'FWD',nationality:'Argentina',age:39,foot:'Left',overall:91,pace:85,shooting:95,passing:96,dribbling:97,defending:38,physical:65,imageUrl:'https://commons.wikimedia.org/wiki/Special:FilePath/Lionel_messi.jpg?width=500'},
+{name:'Cristiano Ronaldo',position:'FWD',nationality:'Portugal',age:41,foot:'Right',overall:88,pace:82,shooting:94,passing:81,dribbling:85,defending:35,physical:77,imageUrl:'https://commons.wikimedia.org/wiki/Special:FilePath/CRonaldo.jpg?width=500'},
+{name:'Kylian Mbappe',position:'FWD',nationality:'France',age:27,foot:'Right',overall:92,pace:97,shooting:91,passing:84,dribbling:93,defending:39,physical:80},
+{name:'Erling Haaland',position:'FWD',nationality:'Norway',age:26,foot:'Left',overall:91,pace:88,shooting:96,passing:79,dribbling:85,defending:45,physical:93},
+{name:'Mohamed Salah',position:'FWD',nationality:'Egypt',age:34,foot:'Left',overall:88,pace:89,shooting:90,passing:83,dribbling:90,defending:45,physical:72},
+{name:'Vinicius Junior',position:'FWD',nationality:'Brazil',age:26,foot:'Right',overall:90,pace:95,shooting:86,passing:82,dribbling:95,defending:32,physical:75},
+{name:'Jude Bellingham',position:'MID',nationality:'England',age:23,foot:'Right',overall:90,pace:80,shooting:84,passing:88,dribbling:89,defending:78,physical:84},
+{name:'Kevin De Bruyne',position:'MID',nationality:'Belgium',age:35,foot:'Right',overall:87,pace:72,shooting:87,passing:95,dribbling:86,defending:55,physical:78},
+{name:'Rodri',position:'MID',nationality:'Spain',age:30,foot:'Right',overall:89,pace:65,shooting:79,passing:94,dribbling:85,defending:89,physical:87},
+{name:'Pedri',position:'MID',nationality:'Spain',age:23,foot:'Right',overall:88,pace:77,shooting:69,passing:93,dribbling:91,defending:62,physical:65},
+{name:'Virgil van Dijk',position:'DEF',nationality:'Netherlands',age:35,foot:'Right',overall:88,pace:79,shooting:60,passing:80,dribbling:72,defending:94,physical:91},
+{name:'Achraf Hakimi',position:'DEF',nationality:'Morocco',age:27,foot:'Right',overall:87,pace:95,shooting:72,passing:82,dribbling:85,defending:78,physical:83},
+{name:'William Saliba',position:'DEF',nationality:'France',age:25,foot:'Right',overall:87,pace:82,shooting:35,passing:78,dribbling:68,defending:91,physical:88},
+{name:'Antonio Rudiger',position:'DEF',nationality:'Germany',age:33,foot:'Right',overall:85,pace:83,shooting:40,passing:75,dribbling:63,defending:88,physical:94},
+{name:'Alisson Becker',position:'GK',nationality:'Brazil',age:33,foot:'Right',overall:89,pace:55,shooting:30,passing:85,dribbling:40,defending:30,physical:82},
+{name:'Thibaut Courtois',position:'GK',nationality:'Belgium',age:34,foot:'Left',overall:89,pace:48,shooting:25,passing:82,dribbling:35,defending:28,physical:80}
+];
+
 function newPlayer(clubId, position, bot = false) {
-  const overall = 60 + Math.floor(Math.random() * 24);
+  const candidates = REAL_PLAYERS.filter(x => x.position === position);
+  const base = candidates[Math.floor(Math.random() * candidates.length)] || {name:randomName(),position,overall:72,pace:70,shooting:65,passing:65,dribbling:65,defending:65,physical:65,nationality:'International',age:24,foot:'Right'};
   const p = {
-    id: makeId('pl'),
-    clubId,
-    name: randomName(),
-    position,
-    overall,
-    fitness: 85 + Math.floor(Math.random() * 16),
-    form: 65 + Math.floor(Math.random() * 26),
-    fatigue: 0,
-    shooting: 48 + Math.floor(Math.random() * 46),
-    passing: 48 + Math.floor(Math.random() * 46),
-    defending: 48 + Math.floor(Math.random() * 46),
-    marketValue: 45000 + overall * 4200,
-    wage: 650 + overall * 18,
-    contractMonths: 12 + Math.floor(Math.random() * 25),
-    listed: bot && Math.random() < 0.6
+    id: makeId('pl'), clubId, name: base.name, position: base.position, nationality: base.nationality,
+    age: base.age, preferredFoot: base.foot, overall: base.overall,
+    pace: base.pace, shooting: base.shooting, passing: base.passing, dribbling: base.dribbling,
+    defending: base.defending, physical: base.physical, imageUrl: base.imageUrl || '',
+    fitness: 85 + Math.floor(Math.random() * 16), form: 65 + Math.floor(Math.random() * 26), fatigue: 0,
+    marketValue: 300000 + base.overall * 18000, wage: 1800 + base.overall * 35,
+    contractMonths: 12 + Math.floor(Math.random() * 25), listed: bot && Math.random() < 0.6
   };
   db.players.push(p);
   return p;
