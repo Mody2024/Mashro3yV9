@@ -7,8 +7,11 @@ const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
 const DATA_DIR = process.env.SKL_DATA_DIR || path.join(ROOT, '.data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_SECRET_KEY);
 
-fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!USE_SUPABASE) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const makeId = prefix => prefix + '_' + crypto.randomBytes(7).toString('hex');
 const now = () => new Date().toISOString();
@@ -20,18 +23,62 @@ const emptyDb = () => ({
   notifications: [], transactions: [], training: []
 });
 
-let db;
-try {
-  db = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) : emptyDb();
-} catch {
-  db = emptyDb();
+let db = emptyDb();
+const normalizeDb = value => {
+  const out = value && typeof value === 'object' ? value : emptyDb();
+  for (const k of Object.keys(emptyDb())) if (!Array.isArray(out[k])) out[k] = [];
+  return out;
+};
+
+async function supabaseRequest(pathname, options = {}) {
+  const r = await fetch(SUPABASE_URL + '/rest/v1/' + pathname, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_SECRET_KEY,
+      Authorization: 'Bearer ' + SUPABASE_SECRET_KEY,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+  const text = await r.text();
+  if (!r.ok) throw new Error('Supabase ' + r.status + ': ' + text);
+  return text ? JSON.parse(text) : null;
 }
 
-for (const k of Object.keys(emptyDb())) if (!Array.isArray(db[k])) db[k] = [];
+async function loadDb() {
+  if (!USE_SUPABASE) {
+    try { db = normalizeDb(fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) : emptyDb()); }
+    catch { db = emptyDb(); }
+    return;
+  }
+  const rows = await supabaseRequest('skl_state?id=eq.1&select=state');
+  if (rows.length) {
+    db = normalizeDb(rows[0].state);
+    return;
+  }
+  db = emptyDb();
+  await supabaseRequest('skl_state', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ id: 1, state: db })
+  });
+}
+
+let saveChain = Promise.resolve();
 const save = () => {
-  const tmp = DB_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(db));
-  fs.renameSync(tmp, DB_FILE);
+  if (!USE_SUPABASE) {
+    const tmp = DB_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(db));
+    fs.renameSync(tmp, DB_FILE);
+    return Promise.resolve();
+  }
+  const snapshot = JSON.parse(JSON.stringify(db));
+  saveChain = saveChain.then(() => supabaseRequest('skl_state?on_conflict=id', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ id: 1, state: snapshot, updated_at: new Date().toISOString() })
+  })).catch(err => console.error('[SKL27] Supabase save failed:', err.message));
+  return saveChain;
 };
 
 const send = (res, status, data) => {
@@ -460,11 +507,13 @@ function tickMatch(m) {
   m.updatedAt = now();
 }
 
-setInterval(() => {
-  let dirty = false;
-  for (const m of db.matches.filter(x => x.status === 'live')) { tickMatch(m); dirty = true; }
-  if (dirty) save();
-}, 500);
+function startMatchLoop() {
+  setInterval(() => {
+    let dirty = false;
+    for (const m of db.matches.filter(x => x.status === 'live')) { tickMatch(m); dirty = true; }
+    if (dirty) save();
+  }, 500);
+}
 
 function requireClub(u) {
   if (!u.clubId || !club(u.clubId)) throw fail('Create a club first.');
@@ -812,4 +861,13 @@ const server = http.createServer((req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('SKL27 server listening on port ' + PORT));
+async function boot() {
+  try {
+    await loadDb();
+    startMatchLoop();
+    server.listen(PORT, () => console.log('SKL27 server listening on port ' + PORT + (USE_SUPABASE ? ' with Supabase persistence' : ' with local persistence')));
+  } catch (err) {
+    console.error('[SKL27] Database startup failed:', err.message);
+  }
+}
+boot();
